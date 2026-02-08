@@ -1,0 +1,40 @@
+{
+  "name": "nexus-chat",
+  "version": "1.0.0",
+  "description": "Discord-like chat platform built with GitHub Pages and Supabase",
+  "main": "index.html",
+  "scripts": {
+    "dev": "python -m http.server 8000",
+    "build": "echo 'No build step required for static site'",
+    "deploy": "git add . && git commit -m 'Deploy update' && git push origin main"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yourusername/nexus-chat.git"
+  },
+  "keywords": [
+    "chat",
+    "discord",
+    "real-time",
+    "supabase",
+    "react",
+    "github-pages"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/yourusername/nexus-chat/issues"
+  },
+  "homepage": "https://yourusername.github.io/nexus-chat",
+  "devDependencies": {},
+  "dependencies": {
+    "@supabase/supabase-js": "^2.x.x",
+    "react": "^18.x.x",
+    "react-dom": "^18.x.x"
+  },
+  "browserslist": [
+    ">0.2%",
+    "not dead",
+    "not op_mini all"
+  ]
+}
