@@ -655,8 +655,8 @@
         const { useState, useEffect, useRef } = React;
 
         // Configuration Supabase - À REMPLACER avec vos propres valeurs
-        const SUPABASE_URL = 'https://jxdgqleniwnxfysphbdm.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4ZGdxbGVuaXdueGZ5c3BoYmRtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA1NzU0NjQsImV4cCI6MjA4NjE1MTQ2NH0.N9stmGvscFhzfYXMH7_BaPQEmBB75FZy-Re9IFooO3I';
+        const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+        const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
 
         // Initialiser Supabase
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -790,6 +790,7 @@
             const [messages, setMessages] = useState([]);
             const [messageInput, setMessageInput] = useState('');
             const messagesEndRef = useRef(null);
+            const channelRef = useRef(null);
 
             // Messages démo
             const demoMessages = [
@@ -806,51 +807,74 @@
                 messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
             }, [messages]);
 
-            // Setup Realtime avec Broadcast (pas besoin de réplication!)
+            // Setup Realtime avec Broadcast - version corrigée
             useEffect(() => {
-                if (!activeChannel || !user) return;
+                if (!user) return;
 
-                // Créer un canal Realtime unique pour ce channel
-                const channel = supabase.channel(`room:${activeChannel}`, {
+                // Nettoyer l'ancien canal si existant
+                if (channelRef.current) {
+                    supabase.removeChannel(channelRef.current);
+                }
+
+                // Créer un nouveau canal pour le channel actif
+                const realtimeChannel = supabase.channel(`${activeChannel}`, {
                     config: {
-                        broadcast: { self: true }
+                        broadcast: { 
+                            self: false, // Ne pas recevoir ses propres messages
+                            ack: false   // Pas besoin d'acknowledgement
+                        },
+                        private: true  // Active l'autorisation RLS
                     }
                 });
 
                 // Écouter les nouveaux messages
-                channel
-                    .on('broadcast', { event: 'new-message' }, ({ payload }) => {
+                realtimeChannel
+                    .on('broadcast', { event: 'message' }, ({ payload }) => {
+                        console.log('Message reçu:', payload);
                         setMessages(prev => [...prev, payload]);
                     })
-                    .subscribe();
+                    .subscribe((status) => {
+                        console.log('Realtime status:', status);
+                        if (status === 'SUBSCRIBED') {
+                            console.log('✅ Connecté au canal:', activeChannel);
+                        }
+                    });
+
+                channelRef.current = realtimeChannel;
 
                 return () => {
-                    supabase.removeChannel(channel);
+                    if (channelRef.current) {
+                        supabase.removeChannel(channelRef.current);
+                        channelRef.current = null;
+                    }
                 };
             }, [activeChannel, user]);
 
             const handleSendMessage = async (e) => {
                 e.preventDefault();
-                if (messageInput.trim()) {
-                    const newMessage = {
-                        id: Date.now(),
-                        author: user?.user_metadata?.username || user?.email?.split('@')[0] || 'Utilisateur',
-                        text: messageInput,
-                        timestamp: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
-                    };
-                    
-                    // Ajouter localement
-                    setMessages([...messages, newMessage]);
-                    
-                    // Broadcaster aux autres utilisateurs via Realtime
-                    const channel = supabase.channel(`room:${activeChannel}`);
-                    await channel.send({
+                if (!messageInput.trim() || !channelRef.current) return;
+
+                const newMessage = {
+                    id: Date.now(),
+                    author: user?.user_metadata?.username || user?.email?.split('@')[0] || 'Utilisateur',
+                    text: messageInput,
+                    timestamp: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+                };
+                
+                // Ajouter le message localement d'abord
+                setMessages(prev => [...prev, newMessage]);
+                setMessageInput('');
+                
+                // Broadcaster aux autres utilisateurs
+                try {
+                    await channelRef.current.send({
                         type: 'broadcast',
-                        event: 'new-message',
+                        event: 'message',
                         payload: newMessage
                     });
-                    
-                    setMessageInput('');
+                    console.log('Message envoyé:', newMessage);
+                } catch (error) {
+                    console.error('Erreur envoi message:', error);
                 }
             };
 
